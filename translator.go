@@ -248,16 +248,16 @@ func (t Translator) Decode(x reflect.Value, d interface{}) error {
 			}
 		}
 		if u, ok := d.([]interface{}); ok {
-			v := reflect.New(y.Elem()).Elem()
 			n := x
 			for i, l := 0, len(u); i < l; i++ {
+				v := reflect.New(y.Elem()).Elem()
 				e := t.Decode(v, u[i])
 				if e != nil {
 					return e
 				}
 				n = reflect.Append(n, v)
 			}
-			x = n
+			x.Set(n)
 			return nil
 		}
 	case reflect.Array:
@@ -280,13 +280,13 @@ func (t Translator) Decode(x reflect.Value, d interface{}) error {
 			return nil
 		}
 		if u, ok := d.([]Item); ok {
-			k := reflect.New(y.Key()).Elem()
-			v := reflect.New(y.Elem()).Elem()
 			for i, l := 0, len(u); i < l; i++ {
+				k := reflect.New(y.Key()).Elem()
 				e := t.Decode(k, u[i].K)
 				if e != nil {
 					return e
 				}
+				v := reflect.New(y.Elem()).Elem()
 				e = t.Decode(v, u[i].V)
 				if e != nil {
 					return e
@@ -297,8 +297,8 @@ func (t Translator) Decode(x reflect.Value, d interface{}) error {
 		}
 		if u, ok := d.(map[string]interface{}); ok {
 			if y.Key().Kind() == reflect.String {
-				v := reflect.New(y.Elem()).Elem()
 				for K, V := range u {
+					v := reflect.New(y.Elem()).Elem()
 					e := t.Decode(v, V)
 					if e != nil {
 						return e

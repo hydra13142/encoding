@@ -236,5 +236,5 @@ func NewEncoder(e *Encoding, w io.Writer) io.Writer {
 
 // 返回一个io.Reader接口，所有下层读取的数据都会先解码
 func NewDecoder(e *Encoding, r io.Reader) io.Reader {
-	return &reader{e, r, make([]byte, 4096), 0}
+	return &reader{e, r, make([]byte, 4096), nil, 0}
 }
