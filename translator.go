@@ -11,6 +11,8 @@ var (
 	UnsupportType = errors.New("unsupport type")
 	// 解码时可能出现的错误
 	UnmatchedType = errors.New("unmatched type")
+	// 编码格式错误
+	SyntaxError = errors.New("syntax error")
 )
 
 // 表示映射的一个键值对
@@ -25,73 +27,47 @@ type Attr struct {
 	V interface{}
 }
 
-// 判断一个值是否为零值
-func Zero(x reflect.Value) bool {
-	switch x.Kind() {
-	case reflect.Bool:
-		return x.Bool() == false
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return x.Int() == 0
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return x.Uint() == 0
-	case reflect.Float32, reflect.Float64:
-		return x.Float() == 0
-	case reflect.Complex64, reflect.Complex128:
-		return x.Complex() == (0 + 0i)
-	case reflect.UnsafePointer:
-		return x.Pointer() == 0
-	case reflect.String:
-		return x.String() == ""
-	case reflect.Interface, reflect.Ptr, reflect.Chan, reflect.Func:
-		return x.IsNil()
-	case reflect.Slice, reflect.Map:
-		return x.IsNil() || x.Len() == 0
-	case reflect.Array:
-		for i, l := 0, x.Len(); i < l; i++ {
-			if !Zero(x.Index(i)) {
-				return false
-			}
-		}
-	case reflect.Struct:
-		for i, l := 0, x.NumField(); i < l; i++ {
-			if !Zero(x.Field(i)) {
-				return false
-			}
-		}
-	}
-	return true
+// 实现中间数据与具体类型编解码
+type Translator struct {
+	Name string
+	Tag  map[reflect.Type][]Label
+	Raw  map[reflect.Type]struct{}
 }
 
-// 实现中间数据与具体类型编解码
-type Translator string
-
-// 获取某个字段的信息（是否导出，名称，是否零值不编码）
-func (t Translator) Refer(f *reflect.StructField) (bool, string, bool) {
-	if f.Name[0] < 'A' || f.Name[0] > 'Z' {
-		return false, "", false
+// 获取某结构体类型的标签信息
+func (this *Translator) GetLabel(x reflect.Type) []Label {
+	p := make([]Label, 0, 0)
+	for i, l := 0, x.NumField(); i < l; i++ {
+		f := x.Field(i)
+		if f.Name[0] < 'A' || f.Name[0] > 'Z' {
+			continue
+		}
+		tag := f.Tag.Get(string(this.Name))
+		if tag == "-" {
+			continue
+		}
+		if tag == "" {
+			p = append(p, Label{i, []string{f.Name}})
+		}
+		y := make([]string, 0, 0)
+		for _, x := range strings.Split(tag, ",") {
+			y = append(y, strings.TrimSpace(x))
+		}
+		if y[0] == "" {
+			y[0] = f.Name
+		}
+		p = append(p, Label{i, y})
 	}
-	tag := f.Tag.Get(string(t))
-	if tag == "-" {
-		return false, "", false
-	}
-	if tag == "" {
-		return true, f.Name, false
-	}
-	x := strings.SplitN(tag, ",", 2)
-	n := strings.TrimSpace(x[0])
-	o := false
-	if n == "" {
-		n = f.Name
-	}
-	if len(x) == 2 {
-		o = (strings.TrimSpace(x[1]) == "omitempty")
-	}
-	return true, n, o
+	this.Tag[x] = p
+	return p
 }
 
 // 编码一个值为中间数据
-func (t Translator) Encode(x reflect.Value) (interface{}, error) {
+func (this *Translator) Encode(x reflect.Value) (interface{}, error) {
 	y := x.Type()
+	if _, ok := this.Raw[y]; ok {
+		return x.Interface(), nil
+	}
 	switch x.Kind() {
 	case reflect.Bool:
 		return x.Bool(), nil
@@ -109,7 +85,7 @@ func (t Translator) Encode(x reflect.Value) (interface{}, error) {
 		if x.IsNil() {
 			return nil, nil
 		}
-		return t.Encode(x.Elem())
+		return this.Encode(x.Elem())
 	case reflect.Slice:
 		if x.IsNil() {
 			return nil, nil
@@ -121,7 +97,7 @@ func (t Translator) Encode(x reflect.Value) (interface{}, error) {
 	case reflect.Array:
 		s := []interface{}{}
 		for i, l := 0, x.Len(); i < l; i++ {
-			v, e := t.Encode(x.Index(i))
+			v, e := this.Encode(x.Index(i))
 			if e != nil {
 				return nil, e
 			}
@@ -132,24 +108,13 @@ func (t Translator) Encode(x reflect.Value) (interface{}, error) {
 		if x.IsNil() {
 			return nil, nil
 		}
-		if y.Key().Kind() == reflect.String {
-			s := []Attr{}
-			for _, k := range x.MapKeys() {
-				V, e := t.Encode(x.MapIndex(k))
-				if e != nil {
-					return nil, e
-				}
-				s = append(s, Attr{k.String(), V})
-			}
-			return s, nil
-		}
 		s := []Item{}
 		for _, k := range x.MapKeys() {
-			K, e := t.Encode(k)
+			K, e := this.Encode(k)
 			if e != nil {
 				return nil, e
 			}
-			V, e := t.Encode(x.MapIndex(k))
+			V, e := this.Encode(x.MapIndex(k))
 			if e != nil {
 				return nil, e
 			}
@@ -157,19 +122,19 @@ func (t Translator) Encode(x reflect.Value) (interface{}, error) {
 		}
 		return s, nil
 	case reflect.Struct:
+		label, ok := this.Tag[y]
+		if !ok {
+			label = this.GetLabel(y)
+		}
 		s := []Attr{}
-		for i, l := 0, x.NumField(); i < l; i++ {
-			f := y.Field(i)
-			v := x.Field(i)
-			ex, nm, op := t.Refer(&f)
-			if ex {
-				if !op || !Zero(v) {
-					V, e := t.Encode(v)
-					if e != nil {
-						return nil, e
-					}
-					s = append(s, Attr{nm, V})
+		for i := 0; i < len(label); i++ {
+			v := x.Field(label[i].N)
+			if !label[i].Has("omitempty") || !Zero(v) {
+				V, e := this.Encode(v)
+				if e != nil {
+					return nil, e
 				}
+				s = append(s, Attr{label[i].Name(), V})
 			}
 		}
 		return s, nil
@@ -178,8 +143,12 @@ func (t Translator) Encode(x reflect.Value) (interface{}, error) {
 }
 
 // 解码中间数据并填充值
-func (t Translator) Decode(x reflect.Value, d interface{}) error {
+func (this *Translator) Decode(x reflect.Value, d interface{}) error {
 	y := x.Type()
+	if y == reflect.TypeOf(d) {
+		x.Set(reflect.ValueOf(d))
+		return nil
+	}
 	switch x.Kind() {
 	case reflect.Bool:
 		if u, ok := d.(bool); ok {
@@ -223,7 +192,7 @@ func (t Translator) Decode(x reflect.Value, d interface{}) error {
 			if x.IsNil() {
 				x.Set(reflect.New(y))
 			}
-			return t.Decode(x.Elem(), d)
+			return this.Decode(x.Elem(), d)
 		}
 	case reflect.Interface:
 		if d == nil {
@@ -251,7 +220,7 @@ func (t Translator) Decode(x reflect.Value, d interface{}) error {
 			n := x
 			for i, l := 0, len(u); i < l; i++ {
 				v := reflect.New(y.Elem()).Elem()
-				e := t.Decode(v, u[i])
+				e := this.Decode(v, u[i])
 				if e != nil {
 					return e
 				}
@@ -267,7 +236,7 @@ func (t Translator) Decode(x reflect.Value, d interface{}) error {
 				l = len(u)
 			}
 			for i := 0; i < l; i++ {
-				e := t.Decode(x.Index(i), u[i])
+				e := this.Decode(x.Index(i), u[i])
 				if e != nil {
 					return e
 				}
@@ -282,12 +251,12 @@ func (t Translator) Decode(x reflect.Value, d interface{}) error {
 		if u, ok := d.([]Item); ok {
 			for i, l := 0, len(u); i < l; i++ {
 				k := reflect.New(y.Key()).Elem()
-				e := t.Decode(k, u[i].K)
+				e := this.Decode(k, u[i].K)
 				if e != nil {
 					return e
 				}
 				v := reflect.New(y.Elem()).Elem()
-				e = t.Decode(v, u[i].V)
+				e = this.Decode(v, u[i].V)
 				if e != nil {
 					return e
 				}
@@ -299,7 +268,7 @@ func (t Translator) Decode(x reflect.Value, d interface{}) error {
 			if y.Key().Kind() == reflect.String {
 				for K, V := range u {
 					v := reflect.New(y.Elem()).Elem()
-					e := t.Decode(v, V)
+					e := this.Decode(v, V)
 					if e != nil {
 						return e
 					}
@@ -310,19 +279,19 @@ func (t Translator) Decode(x reflect.Value, d interface{}) error {
 		}
 	case reflect.Struct:
 		if u, ok := d.(map[string]interface{}); ok {
-			for i, l := 0, x.NumField(); i < l; i++ {
-				f := y.Field(i)
-				v := x.Field(i)
-				ex, nm, op := t.Refer(&f)
-				if ex {
-					if w, ok := u[nm]; ok {
-						e := t.Decode(v, w)
-						if e != nil {
-							return e
-						}
-					} else if op {
-						v.Set(reflect.Zero(f.Type))
+			label, ok := this.Tag[y]
+			if !ok {
+				label = this.GetLabel(y)
+			}
+			for i := 0; i < len(label); i++ {
+				v := x.Field(label[i].N)
+				if w, ok := u[label[i].Name()]; ok {
+					e := this.Decode(v, w)
+					if e != nil {
+						return e
 					}
+				} else if label[i].Has("omitempty") {
+					v.Set(reflect.Zero(v.Type()))
 				}
 			}
 			return nil

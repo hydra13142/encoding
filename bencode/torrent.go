@@ -14,17 +14,17 @@ type Torrent struct {
 
 // bt种子的文件信息
 type FileInfo struct {
-	Files        []File   `bencode:"files,omitempty"`
-	Name         string   `bencode:"name"`
-	Length       int      `bencode:"length,omitempty"`
-	Ed2k         string   `bencode:"ed2k,omitempty"`
-	Md5Sum       string   `bencode:"md5sum,omitempty"`
-	FileHash     string   `bencode:"filehash,omitempty"`
-	PieceLength  int      `bencode:"piece length"`
-	Pieces       string   `bencode:"pieces"`
-	FileDuration []int    `bencode:"file-duration,omitempty"`
-	FileMedia    []int    `bencode:"file-media,omitempty"`
-	Profiles     MetaData `bencode:"profiles,omitempty"`
+	Files        []File     `bencode:"files,omitempty"`
+	Name         string     `bencode:"name"`
+	Length       int        `bencode:"length,omitempty"`
+	Ed2k         string     `bencode:"ed2k,omitempty"`
+	Md5Sum       string     `bencode:"md5sum,omitempty"`
+	FileHash     string     `bencode:"filehash,omitempty"`
+	PieceLength  int        `bencode:"piece length"`
+	Pieces       string     `bencode:"pieces"`
+	FileDuration []int      `bencode:"file-duration,omitempty"`
+	FileMedia    []int      `bencode:"file-media,omitempty"`
+	Profiles     []MetaData `bencode:"profiles,omitempty"`
 }
 
 // 媒体文件元数据
