@@ -32,7 +32,7 @@ func (this *Encoder) long(i uint) {
 func (this Encoder) bytes(s string) {
 	i, ok := this.Str[s]
 	if ok {
-		this.uint29(uint(len(s)<<1) | 0)
+		this.uint29(uint(i<<1) | 0)
 		return
 	} else {
 		this.uint29(uint(len(s)<<1) | 1)
