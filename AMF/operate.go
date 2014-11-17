@@ -25,7 +25,7 @@ func NewDecoder(r io.Reader) *Decoder {
 
 // 创建编码器
 func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{w}
+	return &Encoder{w, make(map[string]int)}
 }
 
 func (this *Decoder) Decode(x interface{}) error {

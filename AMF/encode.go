@@ -9,6 +9,7 @@ import (
 
 type Encoder struct {
 	io.Writer
+	Str map[string]int
 }
 
 func (this *Encoder) float(x float64) {
@@ -29,8 +30,15 @@ func (this *Encoder) long(i uint) {
 }
 
 func (this Encoder) bytes(s string) {
-	this.uint29(uint(len(s)<<1) | 1)
-	this.Write([]byte(s))
+	i, ok := this.Str[s]
+	if ok {
+		this.uint29(uint(len(s)<<1) | 0)
+		return
+	} else {
+		this.uint29(uint(len(s)<<1) | 1)
+		this.Str[s] = len(this.Str)
+		this.Write([]byte(s))
+	}
 }
 
 func (this *Encoder) uint29(i uint) {
