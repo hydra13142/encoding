@@ -16,44 +16,60 @@ func NewIterator(r io.Reader) *Iterator {
 }
 
 // 获取一个字节
-func (p *Iterator) ReadByte() byte {
+func (this *Iterator) ReadByte() byte {
 	var c byte
 	for {
-		if p.a < p.b {
-			c = p.m[p.a]
-			p.a++
+		if this.a < this.b {
+			c = this.m[this.a]
+			this.a++
 			break
 		}
-		if p.o != nil {
-			panic(p.o)
+		if this.o != nil {
+			panic(this.o)
 		}
-		p.b, p.o = p.r.Read(p.m)
-		p.a = 0
+		this.b, this.o = this.r.Read(this.m)
+		this.a = 0
 	}
 	return c
 }
 
 // 退回一个字节
-func (p *Iterator) UnreadByte() {
-	p.a--
+func (this *Iterator) UnreadByte() {
+	this.a--
 }
 
 // 读取一定量字节
-func (p *Iterator) ReadBytes(n int) []byte {
+func (this *Iterator) ReadBytes(n int) []byte {
 	u := make([]byte, n)
 	for v := u; ; {
-		if p.a+n <= p.b {
-			copy(v, p.m[p.a:p.a+n])
-			p.a += n
+		if this.a+n <= this.b {
+			copy(v, this.m[this.a:this.a+n])
+			this.a += n
 			break
 		}
-		x := copy(v, p.m[p.a:p.b])
+		x := copy(v, this.m[this.a:this.b])
 		n, v = n-x, v[x:]
-		if p.o != nil {
-			panic(p.o)
+		this.a, this.a = 0, 0
+		if this.o != nil {
+			panic(this.o)
 		}
-		p.b, p.o = p.r.Read(p.m)
-		p.a = 0
+		this.b, this.o = this.r.Read(this.m)
 	}
 	return u
+}
+
+func (this *Iterator) Read(data []byte) (int, error) {
+	n := len(data)
+	if this.a+n <= this.b {
+		copy(data, this.m[this.a:this.a+n])
+		this.a += n
+		return n, nil
+	}
+	i := copy(data, this.m[this.a:this.b])
+	this.a, this.a = 0, 0
+	if this.o != nil {
+		return i, this.o
+	}
+	n, this.o = this.r.Read(data[i:])
+	return n + i, this.o
 }
