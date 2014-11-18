@@ -83,7 +83,7 @@ func (this *Decoder) decodeAMF0() (it interface{}, er error) {
 	case 0x05: // null
 		return nil, nil
 	case 0x06: // undefined
-		return Undefined{}, nil
+		return encoding.Undefined{}, nil
 	case 0x02: // string
 		return this.bytes(), nil
 	case 0x0c: // long string
@@ -179,7 +179,7 @@ func (this *Decoder) decodeAMF3() (it interface{}, er error) {
 	}()
 	switch this.ReadByte() {
 	case 0x00: // undefined
-		return Undefined{}, nil
+		return encoding.Undefined{}, nil
 	case 0x01: // null
 		return nil, nil
 	case 0x02: // false

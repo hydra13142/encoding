@@ -27,6 +27,9 @@ type Attr struct {
 	V interface{}
 }
 
+// 用来表示一个“未定义值”
+type Undefined struct{}
+
 // 实现中间数据与具体类型编解码
 type Translator struct {
 	Name string
@@ -148,6 +151,9 @@ func (this *Translator) Decode(x reflect.Value, d interface{}) error {
 	if y == reflect.TypeOf(d) {
 		x.Set(reflect.ValueOf(d))
 		return nil
+	}
+	if _, ok := d.(Undefined); ok {
+		d = nil
 	}
 	switch x.Kind() {
 	case reflect.Bool:
