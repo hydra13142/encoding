@@ -7,6 +7,7 @@ import (
 	"unsafe"
 )
 
+// 解码器
 type Decoder struct {
 	*encoding.Iterator
 	Obj []interface{}

@@ -8,6 +8,7 @@ import (
 // 目标容量不足的错误，其值表示源被消费的字节数
 type CapacityShortageError int
 
+// 实现error接口
 func (d CapacityShortageError) Error() string {
 	return fmt.Sprintf("lack of capacity error at %d", int(d))
 }
@@ -15,6 +16,7 @@ func (d CapacityShortageError) Error() string {
 // 源数据不完整的错误，其值表示源下一应被解码的字节索引
 type IncompleteInputError int
 
+// 实现error接口
 func (d IncompleteInputError) Error() string {
 	return fmt.Sprintf("incomplete input error at %d", int(d))
 }
@@ -22,6 +24,7 @@ func (d IncompleteInputError) Error() string {
 // 源数据的格式错误，其值表示源下一应被解码的字节索引
 type CorruptInputError int
 
+// 实现error接口
 func (d CorruptInputError) Error() string {
 	return fmt.Sprintf("corrupt input error at %d", int(d))
 }

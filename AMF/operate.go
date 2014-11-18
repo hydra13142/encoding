@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// 解码的目标填充参数必须是指针
 var TypeError = errors.New("need point type")
 
 var rawtype = map[reflect.Type]struct{}{
@@ -28,6 +29,7 @@ func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{w, make(map[string]int)}
 }
 
+// 解码并填充
 func (this *Decoder) Decode(x interface{}) error {
 	v := reflect.ValueOf(x)
 	if v.Kind() == reflect.Invalid {
@@ -46,6 +48,7 @@ func (this *Decoder) Decode(x interface{}) error {
 	return translator.Decode(v.Elem(), u)
 }
 
+// 编码并写入
 func (this *Encoder) Encode(x interface{}, s string) error {
 	v := reflect.ValueOf(x)
 	if v.Kind() == reflect.Ptr {

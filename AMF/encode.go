@@ -7,6 +7,7 @@ import (
 	"unsafe"
 )
 
+// 编码器
 type Encoder struct {
 	io.Writer
 	Str map[string]int
@@ -29,7 +30,7 @@ func (this *Encoder) long(i uint) {
 	this.Write([]byte{byte(i >> 24), byte(i >> 16), byte(i >> 8), byte(i)})
 }
 
-func (this Encoder) bytes(s string) {
+func (this *Encoder) bytes(s string) {
 	i, ok := this.Str[s]
 	if ok {
 		this.uint29(uint(i<<1) | 0)
