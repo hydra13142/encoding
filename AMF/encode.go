@@ -73,7 +73,7 @@ func (this *Encoder) encodeAMF0(x interface{}) error {
 	case string:
 		s := x.(string)
 		l := uint(len(s))
-		if l > 65535 {
+		if l < 65535 {
 			this.Write([]byte{0x02})
 			this.short(l)
 		} else {
